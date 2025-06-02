@@ -10,12 +10,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      if (session?.user?.id && !store.userWishlistLoaded) {
-        console.log('Providers: User authenticated, loading wishlist...');
-        store.loadUserWishlist();
+      if (session?.user?.id) {
+        if (!store.userWishlistLoaded) {
+          console.log('Providers: User authenticated, loading wishlist...');
+          store.loadUserWishlist();
+        }
+        if (!store.userWatchedListLoaded) {
+          console.log('Providers: User authenticated, loading watched list...');
+          store.loadUserWatchedList();
+        }
       }
     } else if (status === 'unauthenticated') {
-      if (store.userWishlistLoaded) {
+      if (store.userWishlistLoaded || store.userWatchedListLoaded) {
         console.log('Providers: User unauthenticated, clearing session data...');
         store.clearUserSessionData();
       }

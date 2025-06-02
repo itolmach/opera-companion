@@ -29,20 +29,23 @@ export interface Composer {
 
 // For the store
 export interface WishlistOpera {
+  id?: string; // Database ID, optional on client before save
   operaId: string;
-  // Potentially store a snapshot of the opera title/composer for quick display
+  userId?: string; // Will be present when fetched from DB
+  addedDate?: Date | string; // Will be present when fetched from DB
   title?: string;
   composer?: string;
 }
 
 export interface WatchedOpera {
+  id?: string; // Database ID, will be present when fetched from DB or after creation
   operaId: string;
-  rating: number; // e.g., 1-5 stars
-  date: string; // ISO date string
+  userId?: string; // Will be present when fetched from DB
+  rating: number; 
+  date: string | Date; // Accept string or Date, store will handle conversion if necessary for API
   venue?: string;
   cast?: { role: string; artist: string }[];
   comments?: { id: string; author: string; date: string; text: string }[];
-  // Potentially store a snapshot of the opera title/composer for quick display
   title?: string;
   composer?: string;
 } 

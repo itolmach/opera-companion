@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Opera, WatchedOpera, WishlistOpera } from '@/types';
+import { Prisma } from '@/generated/prisma/client';
 // import * as api from '../lib/api'; // We'll fetch local data now
 
 interface OperaStore {
@@ -12,15 +13,17 @@ interface OperaStore {
   isLoading: boolean;
   error: string | null;
   userWishlistLoaded: boolean;
+  userWatchedListLoaded: boolean;
   setSearchQuery: (query: string) => void;
   searchOperas: (query: string) => void;
   loadInitialData: () => Promise<void>;
   loadUserWishlist: () => Promise<void>;
   addToWishlist: (operaId: string) => Promise<void>;
   removeFromWishlist: (operaId: string) => Promise<void>;
-  addToWatched: (watched: Omit<WatchedOpera, 'operaId'> & { operaId: string }) => void;
-  removeFromWatched: (operaId: string) => void;
-  addComment: (operaId: string, comment: { text: string; author: string }) => void;
+  loadUserWatchedList: () => Promise<void>;
+  addToWatched: (watchedItemData: Omit<WatchedOpera, 'id' | 'userId' | 'user'>) => Promise<void>;
+  removeFromWatched: (operaId: string) => Promise<void>;
+  addComment: (operaId: string, comment: { text: string; author: string }) => Promise<void>;
   clearUserSessionData: () => void;
 }
 
@@ -35,6 +38,7 @@ export const useOperaStore = create<OperaStore>()(
       isLoading: false,
       error: null,
       userWishlistLoaded: false,
+      userWatchedListLoaded: false,
       setSearchQuery: (query) => {
         set({ searchQuery: query });
         get().searchOperas(query);
@@ -70,14 +74,14 @@ export const useOperaStore = create<OperaStore>()(
         }
       },
       loadUserWishlist: async () => {
-        if (get().userWishlistLoaded) return;
+        if (get().userWishlistLoaded && !get().isLoading) return;
         set({ isLoading: true, error: null });
         try {
           const response = await fetch('/api/wishlist');
           if (!response.ok) {
             if (response.status === 401) {
               console.log('User not authenticated, cannot load wishlist.');
-              set({ isLoading: false, userWishlistLoaded: false });
+              set({ isLoading: false, userWishlistLoaded: false, wishlist: [] });
               return;
             }
             throw new Error('Failed to fetch user wishlist');
@@ -124,39 +128,126 @@ export const useOperaStore = create<OperaStore>()(
           set({ error: (error instanceof Error ? error.message : 'Failed to remove item') });
         }
       },
+      loadUserWatchedList: async () => {
+        if (get().userWatchedListLoaded && !get().isLoading) return;
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/watched');
+          if (!response.ok) {
+            if (response.status === 401) {
+              console.log('User not authenticated, cannot load watched list.');
+              set({ isLoading: false, userWatchedListLoaded: false, watched: [] });
+              return;
+            }
+            throw new Error('Failed to fetch user watched list');
+          }
+          const userWatchedList: WatchedOpera[] = await response.json();
+          set({ watched: userWatchedList, userWatchedListLoaded: true, isLoading: false });
+        } catch (error) {
+          console.error('Error loading user watched list:', error);
+          set({ error: (error instanceof Error ? error.message : 'Failed to load watched list'), isLoading: false, userWatchedListLoaded: false });
+        }
+      },
+      addToWatched: async (watchedItemData) => {
+        try {
+          const payload = {
+            ...watchedItemData,
+            date: new Date(watchedItemData.date).toISOString(),
+          };
+          const response = await fetch('/api/watched', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to add to watched list on server' }));
+            throw new Error(errorData.message || 'Failed to add to watched list on server');
+          }
+          const newWatchedItem: WatchedOpera = await response.json();
+          set((state) => ({
+            watched: [...state.watched.filter(item => item.operaId !== newWatchedItem.operaId), newWatchedItem],
+          }));
+        } catch (error) {
+          console.error('Error adding to watched list:', error);
+          set({ error: (error instanceof Error ? error.message : 'Failed to add item to watched list') });
+        }
+      },
+      removeFromWatched: async (operaIdToRemove) => {
+        try {
+          const response = await fetch(`/api/watched?operaId=${operaIdToRemove}`, {
+            method: 'DELETE',
+          });
+          if (!response.ok) {
+            throw new Error('Failed to remove from watched list on server');
+          }
+          set((state) => ({
+            watched: state.watched.filter((item) => item.operaId !== operaIdToRemove),
+          }));
+        } catch (error) {
+          console.error('Error removing from watched list:', error);
+          set({ error: (error instanceof Error ? error.message : 'Failed to remove item from watched list') });
+        }
+      },
+      addComment: async (operaIdToComment, comment) => {
+        const watchedEntry = get().watched.find(item => item.operaId === operaIdToComment);
+        if (!watchedEntry || !watchedEntry.id) {
+          console.error('Cannot add comment: Watched entry or its DB ID not found locally.');
+          set({ error: 'Cannot add comment: Watched entry not found.'});
+          return;
+        }
+
+        const newComment = {
+            id: crypto.randomUUID(),
+            ...comment,
+            date: new Date().toISOString(),
+        };
+        set(state => ({
+            watched: state.watched.map(item =>
+                item.id === watchedEntry.id
+                    ? { ...item, comments: [...(item.comments || []), newComment] }
+                    : item
+            ),
+        })); 
+
+        try {
+            const updatedComments = [...(watchedEntry.comments || []), newComment];
+            const response = await fetch('/api/watched', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...watchedEntry, comments: updatedComments }), 
+            });
+
+            if (!response.ok) {
+                set(state => ({
+                    watched: state.watched.map(item =>
+                        item.id === watchedEntry.id
+                            ? { ...item, comments: watchedEntry.comments || [] }
+                            : item
+                    ),
+                    error: 'Failed to save comment to server.'
+                }));
+                throw new Error('Failed to save comment to server');
+            }
+            const savedWatchedItem: WatchedOpera = await response.json();
+            set(state => ({
+                watched: state.watched.map(item => item.id === savedWatchedItem.id ? savedWatchedItem : item),
+            }));
+
+        } catch (error) {
+            console.error('Error saving comment:', error);
+            if (!(error instanceof Error && get().error === 'Failed to save comment to server.')){
+                set({ error: (error instanceof Error ? error.message : 'Could not save comment') });
+            }
+        }
+      },
       clearUserSessionData: () => {
         set({
           wishlist: [],
           watched: [],
           userWishlistLoaded: false,
+          userWatchedListLoaded: false,
         });
       },
-      addToWatched: (watchedItem) =>
-        set((state) => ({
-          watched: [...state.watched, watchedItem], 
-        })),
-      removeFromWatched: (operaIdToRemove) =>
-        set((state) => ({
-          watched: state.watched.filter((item) => item.operaId !== operaIdToRemove),
-        })),
-      addComment: (operaIdToComment, comment) =>
-        set((state) => ({
-          watched: state.watched.map((item) =>
-            item.operaId === operaIdToComment
-              ? {
-                  ...item,
-                  comments: [
-                    ...(item.comments || []),
-                    {
-                      id: crypto.randomUUID(),
-                      ...comment,
-                      date: new Date().toISOString(),
-                    },
-                  ],
-                }
-              : item
-          ),
-        })),
     }),
     {
       name: 'opera-storage',
