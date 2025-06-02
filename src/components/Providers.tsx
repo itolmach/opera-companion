@@ -1,17 +1,26 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useOperaStore } from '../store/useOperaStore';
-import { sampleOperas } from '../lib/sample-data';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const store = useOperaStore();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
-    if (store.operas.length === 0) {
-      store.operas = sampleOperas;
+    if (status === 'authenticated') {
+      if (session?.user?.id && !store.userWishlistLoaded) {
+        console.log('Providers: User authenticated, loading wishlist...');
+        store.loadUserWishlist();
+      }
+    } else if (status === 'unauthenticated') {
+      if (store.userWishlistLoaded) {
+        console.log('Providers: User unauthenticated, clearing session data...');
+        store.clearUserSessionData();
+      }
     }
-  }, [store]);
+  }, [status, session, store]);
 
   return <>{children}</>;
 } 
