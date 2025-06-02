@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { MagnifyingGlassIcon, BookmarkIcon, CheckCircleIcon, UserCircleIcon } from "@heroicons/react/24/outline";
+import { BookmarkIcon, CheckCircleIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import AppProviders from "@/components/AppProviders";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -31,9 +31,6 @@ export default function RootLayout({
                     </Link>
                   </div>
                   <div className="flex space-x-8">
-                    <Link href="/" className="inline-flex items-center px-1 pt-1 text-gray-500 hover:text-gray-900">
-                      <MagnifyingGlassIcon className="h-6 w-6" />
-                    </Link>
                     <Link href="/wishlist" className="inline-flex items-center px-1 pt-1 text-gray-500 hover:text-gray-900">
                       <BookmarkIcon className="h-6 w-6" />
                     </Link>
