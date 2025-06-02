@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Opera, WatchedOpera, WishlistOpera } from '@/types';
-import { Prisma } from '@/generated/prisma/client';
 // import * as api from '../lib/api'; // We'll fetch local data now
 
 interface OperaStore {
