@@ -1,1 +1,10 @@
-src/generated/prisma/* 
+node_modules/
+.next/
+prisma/
+src/generated/
+**/generated/
+build/
+# Ignore Prisma client if generated elsewhere
+**/.prisma/
+# Ignore OpenOpus API generated code if any (none found, but placeholder)
+src/lib/openopus/ 

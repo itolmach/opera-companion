@@ -3,28 +3,41 @@
 import { useOperaStore } from '@/store/useOperaStore';
 import { OperaCard } from '@/components/OperaCard';
 import { format } from 'date-fns';
+import { Opera } from '@/types'; // Import Opera type for explicit typing if needed
 
 export default function Watched() {
   const { operas, watched, removeFromWatched } = useOperaStore();
+
+  // Prepare watchedOperas with full opera details
+  // Ensure that entry.opera is not undefined before passing to OperaCard
   const watchedOperas = watched
-    .map((w) => ({
-      ...w,
-      opera: operas.find((o) => o.id === w.operaId)!,
-    }))
+    .map((w) => {
+      const operaDetails = operas.find((o) => o.id === w.operaId);
+      return {
+        ...w,
+        // opera: operaDetails, // This could be undefined
+        // For safety, ensure OperaCard or rendering logic handles potentially undefined operaDetails
+        // Or filter out entries where operaDetails is not found, though this might hide data issues
+        opera: operaDetails!, // Using non-null assertion, assuming operaId always matches an opera in store
+                              // A more robust solution would be to handle cases where operaDetails is undefined
+      };
+    })
+    .filter(entry => entry.opera) // Filter out entries where opera details couldn't be found
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-center text-gray-900">Watched</h1>
       {watchedOperas.length === 0 ? (
-        <p className="text-center text-gray-600">You haven't watched any operas yet</p>
+        <p className="text-center text-gray-600">You haven&apos;t watched any operas yet</p>
       ) : (
         <div className="grid grid-cols-1 gap-6">
           {watchedOperas.map((entry) => (
-            <div key={entry.id} className="bg-white shadow-sm rounded-lg overflow-hidden">
+            <div key={entry.operaId} className="bg-white shadow-sm rounded-lg overflow-hidden">
               <div className="flex flex-col sm:flex-row">
                 <div className="sm:w-1/3">
-                  <OperaCard opera={entry.opera} />
+                  {/* entry.opera is now guaranteed by the filter above */}
+                  <OperaCard opera={entry.opera as Opera} /> 
                 </div>
                 <div className="p-6 sm:w-2/3">
                   <div className="flex justify-between items-start">
@@ -37,7 +50,8 @@ export default function Watched() {
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
-                      {Array.from({ length: 3 }).map((_, i) => (
+                      {/* Display 5 stars for rating */}
+                      {Array.from({ length: 5 }).map((_, i) => (
                         <span
                           key={i}
                           className={`h-6 w-6 ${
@@ -48,7 +62,7 @@ export default function Watched() {
                         </span>
                       ))}
                       <button
-                        onClick={() => removeFromWatched(entry.id)}
+                        onClick={() => removeFromWatched(entry.operaId)} // Use operaId
                         className="ml-4 px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs font-semibold"
                         title="Remove from watched"
                       >
@@ -56,19 +70,23 @@ export default function Watched() {
                       </button>
                     </div>
                   </div>
-                  {entry.cast.length > 0 && (
+
+                  {/* Cast Section - check if cast exists and has members */}
+                  {entry.cast && entry.cast.length > 0 && (
                     <div className="mt-4">
                       <h3 className="text-sm font-medium text-gray-900">Cast</h3>
                       <ul className="mt-2 text-sm text-gray-600">
                         {entry.cast.map((member, i) => (
                           <li key={i}>
-                            {member.name} as {member.role}
+                            {member.artist} as {member.role} {/* Use artist instead of name */}
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {entry.comments.length > 0 && (
+
+                  {/* Comments Section - check if comments exist and have members */}
+                  {entry.comments && entry.comments.length > 0 && (
                     <div className="mt-4">
                       <h3 className="text-sm font-medium text-gray-900">Comments</h3>
                       <ul className="mt-2 space-y-2">

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Opera, WatchedOpera, WishlistOpera } from '../types/opera';
-import * as api from '../lib/api';
+import { Opera, WatchedOpera, WishlistOpera } from '@/types';
+// import * as api from '../lib/api'; // We'll fetch local data now
 
 interface OperaStore {
   allWorks: Opera[];
@@ -13,12 +13,12 @@ interface OperaStore {
   error: string | null;
   setSearchQuery: (query: string) => void;
   searchOperas: (query: string) => void;
-  loadPopularOperas: () => Promise<void>;
+  loadInitialData: () => Promise<void>; // Renamed from loadPopularOperas
   addToWishlist: (operaId: string) => void;
   removeFromWishlist: (operaId: string) => void;
-  addToWatched: (watched: Omit<WatchedOpera, 'id'>) => void;
-  removeFromWatched: (id: string) => void;
-  addComment: (watchedId: string, comment: { text: string; author: string }) => void;
+  addToWatched: (watched: Omit<WatchedOpera, 'operaId'> & { operaId: string }) => void;
+  removeFromWatched: (operaId: string) => void;
+  addComment: (operaId: string, comment: { text: string; author: string }) => void;
 }
 
 export const useOperaStore = create<OperaStore>()(
@@ -42,59 +42,57 @@ export const useOperaStore = create<OperaStore>()(
           set((state) => ({
             operas: state.allWorks.filter((opera) =>
               opera.title.toLowerCase().includes(query.toLowerCase()) ||
-              opera.composer.toLowerCase().includes(query.toLowerCase())
+              (opera.composer && opera.composer.toLowerCase().includes(query.toLowerCase()))
             ),
           }));
         }
       },
-      loadPopularOperas: async () => {
+      loadInitialData: async () => {
+        if (get().allWorks.length > 0) {
+          // Data already loaded or rehydrated from persistence
+          set({ operas: get().allWorks, isLoading: false });
+          return;
+        }
         set({ isLoading: true, error: null });
         try {
-          const works = await api.getPopularOperas();
-          const operas = works.map((work: any) => ({
-            id: `${work.composer.id}-${work.id}`,
-            title: work.title || 'Untitled',
-            composer: work.composer.complete_name || work.composer.name || 'Unknown',
-            synopsis: work.subtitle || '',
-            firstPerformance: {
-              date: work.year || '',
-              place: work.premiere || '',
-            },
-            imageUrl: work.composer.portrait || '/images/placeholder.jpg',
-          }));
-          set({ allWorks: operas, operas, isLoading: false });
+          const response = await fetch('/data/all_operas.json'); // Fetch local JSON
+          if (!response.ok) {
+            throw new Error(`Failed to fetch local opera data: ${response.statusText}`);
+          }
+          const operasData: Opera[] = await response.json();
+          set({ allWorks: operasData, operas: operasData, isLoading: false });
         } catch (error) {
-          console.error('Failed to load popular operas:', error);
-          set({ error: 'Failed to load popular operas', isLoading: false });
+          console.error('Failed to load initial opera data:', error);
+          set({ error: (error instanceof Error ? error.message : 'Failed to load data'), isLoading: false });
         }
       },
-      addToWishlist: (operaId) =>
+      addToWishlist: (operaIdToAdd) =>
         set((state) => ({
           wishlist: [
             ...state.wishlist,
-            { id: crypto.randomUUID(), operaId, addedDate: new Date().toISOString() },
+            { operaId: operaIdToAdd }, 
           ],
         })),
-      removeFromWishlist: (operaId) =>
+      removeFromWishlist: (operaIdToRemove) =>
         set((state) => ({
-          wishlist: state.wishlist.filter((item) => item.operaId !== operaId),
+          wishlist: state.wishlist.filter((item) => item.operaId !== operaIdToRemove),
         })),
-      addToWatched: (watched) =>
+      addToWatched: (watchedItem) =>
         set((state) => ({
-          watched: [...state.watched, { ...watched, id: crypto.randomUUID() }],
+          watched: [...state.watched, watchedItem], 
         })),
-      removeFromWatched: (id) =>
+      removeFromWatched: (operaIdToRemove) =>
         set((state) => ({
-          watched: state.watched.filter((item) => item.id !== id),
+          watched: state.watched.filter((item) => item.operaId !== operaIdToRemove),
         })),
-      addComment: (watchedId, comment) =>
+      addComment: (operaIdToComment, comment) =>
         set((state) => ({
           watched: state.watched.map((item) =>
-            item.id === watchedId
+            item.operaId === operaIdToComment
               ? {
                   ...item,
                   comments: [
-                    ...item.comments,
+                    ...(item.comments || []),
                     {
                       id: crypto.randomUUID(),
                       ...comment,
@@ -108,6 +106,10 @@ export const useOperaStore = create<OperaStore>()(
     }),
     {
       name: 'opera-storage',
+      // By default, all top-level state is persisted. 
+      // We might want to only persist user-specific data like 'watched' and 'wishlist' 
+      // and not 'allWorks' or 'operas' if they are always reloaded from the JSON.
+      // partialize: (state) => ({ watched: state.watched, wishlist: state.wishlist, searchQuery: state.searchQuery }),
     }
   )
 ); 

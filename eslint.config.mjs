@@ -10,6 +10,18 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "prisma/**",
+      "src/generated/**",
+      "**/generated/**",
+      "build/**",
+      "**/.prisma/**",
+      "src/lib/openopus/**"
+    ]
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 

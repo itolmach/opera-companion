@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useOperaStore } from '@/store/useOperaStore';
 import { BookmarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
+import Image from 'next/image';
 
 export default function OperaPage(props: any) {
   const params = props.params;
@@ -28,10 +29,12 @@ export default function OperaPage(props: any) {
     <div className="container mx-auto p-4">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         <div className="relative h-64">
-          <img
+          <Image
             src={opera.imageUrl}
             alt={opera.title}
+            fill
             className="w-full h-full object-cover"
+            style={{ objectFit: 'cover' }}
           />
         </div>
         <div className="p-6">
@@ -111,7 +114,7 @@ export default function OperaPage(props: any) {
                   {'☆'.repeat(5 - watchedEntry.rating)}
                 </span>
               </div>
-              {watchedEntry.comments.length > 0 && (
+              {watchedEntry && watchedEntry.comments && watchedEntry.comments.length > 0 && (
                 <div className="mt-4">
                   <h4 className="font-semibold">Comments:</h4>
                   <ul className="mt-2 space-y-2">

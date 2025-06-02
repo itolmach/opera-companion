@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Opera } from '../types/opera';
+import { Opera } from '@/types';
 
 interface OperaCardProps {
   opera: Opera;
@@ -12,7 +12,7 @@ export function OperaCard({ opera }: OperaCardProps) {
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
         <div className="relative h-48 w-full">
           <Image
-            src={opera.imageUrl}
+            src={opera.imageUrl || '/images/placeholder.jpg'}
             alt={opera.title}
             fill
             className="object-cover rounded-t-lg"
