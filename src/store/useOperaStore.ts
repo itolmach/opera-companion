@@ -13,6 +13,7 @@ interface OperaStore {
   error: string | null;
   userWishlistLoaded: boolean;
   userWatchedListLoaded: boolean;
+  initialDataLoadAttempted: boolean;
   setSearchQuery: (query: string) => void;
   searchOperas: (query: string) => void;
   loadInitialData: () => Promise<void>;
@@ -38,6 +39,7 @@ export const useOperaStore = create<OperaStore>()(
       error: null,
       userWishlistLoaded: false,
       userWatchedListLoaded: false,
+      initialDataLoadAttempted: false,
       setSearchQuery: (query) => {
         set({ searchQuery: query });
         get().searchOperas(query);
@@ -55,20 +57,21 @@ export const useOperaStore = create<OperaStore>()(
         }
       },
       loadInitialData: async () => {
-        if (get().allWorks.length > 0 && !get().isLoading) {
-          set({ operas: get().allWorks, isLoading: false });
+        if (get().initialDataLoadAttempted && !get().error) {
           return;
         }
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, initialDataLoadAttempted: true });
         try {
+          console.log('[useOperaStore] Attempting to load initial data from /data/all_operas.json');
           const response = await fetch('/data/all_operas.json');
           if (!response.ok) {
-            throw new Error(`Failed to fetch local opera data: ${response.statusText}`);
+            throw new Error(`Failed to fetch local opera data: ${response.statusText} (status: ${response.status})`);
           }
           const operasData: Opera[] = await response.json();
-          set({ allWorks: operasData, operas: operasData, isLoading: false });
+          console.log(`[useOperaStore] Successfully fetched initial data. Number of operas: ${operasData.length}`);
+          set({ allWorks: operasData, operas: operasData, isLoading: false, error: null });
         } catch (error) {
-          console.error('Failed to load initial opera data:', error);
+          console.error('[useOperaStore] Failed to load initial opera data:', error);
           set({ error: (error instanceof Error ? error.message : 'Failed to load data'), isLoading: false });
         }
       },
@@ -256,6 +259,7 @@ export const useOperaStore = create<OperaStore>()(
         searchQuery: state.searchQuery,
         wishlist: state.wishlist,
         watched: state.watched,
+        initialDataLoadAttempted: state.initialDataLoadAttempted,
       }),
     }
   )
