@@ -45,7 +45,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
     }
 
-    const dataToUpsert: Prisma.WatchedOperaCreateInput | Prisma.WatchedOperaUpdateInput = {
+    const dataForOperation: Prisma.WatchedOperaCreateInput | Prisma.WatchedOperaUpdateInput = {
       user: { connect: { id: session.user.id } },
       operaId,
       rating: parseInt(rating, 10),
@@ -55,25 +55,6 @@ export async function POST(request: Request) {
       comments: comments || Prisma.JsonNull,
     };
 
-    const result = await prisma.watchedOpera.upsert({
-      where: {
-        // Need a unique identifier for the user-opera combination if it exists
-        // Let's assume we need to create a custom one or fetch first then update/create
-        // For simplicity, let's ensure operaId is unique per user. If your schema has it:
-        // userId_operaId: { userId: session.user.id, operaId },
-        // If not, we must query first then decide to create or update.
-        // To avoid complexity for now, let's try a simple find and update/create pattern.
-        // This requires a custom unique constraint on (userId, operaId) for upsert to work directly on that.
-        // If such constraint doesn't exist, this upsert won't work as intended without a primary key or unique field for `where`.
-        // Assuming no @@unique([userId, operaId]) in schema for WatchedOpera for this example to be simpler to start:
-        // We'll find existing, then update or create.
-        // THIS IS A SIMPLIFIED APPROACH. A @@unique([userId, operaId]) is better for direct upsert.
-        id: 'will_be_ignored_for_create_needs_proper_unique_field_for_upsert' 
-      },
-      create: dataToUpsert as Prisma.WatchedOperaCreateInput, // userId is part of dataToUpsert through connect
-      update: dataToUpsert as Prisma.WatchedOperaUpdateInput, // userId is part of dataToUpsert through connect
-    });
-
     // SAFER APPROACH without @@unique([userId, operaId]) on WatchedOpera:
     let watchedEntry = await prisma.watchedOpera.findFirst({
         where: { userId: session.user.id, operaId: operaId }
@@ -82,11 +63,11 @@ export async function POST(request: Request) {
     if (watchedEntry) {
         watchedEntry = await prisma.watchedOpera.update({
             where: { id: watchedEntry.id },
-            data: dataToUpsert as Prisma.WatchedOperaUpdateInput
+            data: dataForOperation as Prisma.WatchedOperaUpdateInput
         });
     } else {
         watchedEntry = await prisma.watchedOpera.create({
-            data: dataToUpsert as Prisma.WatchedOperaCreateInput
+            data: dataForOperation as Prisma.WatchedOperaCreateInput
         });
     }
 
