@@ -1,117 +1,139 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { Opera } from '@/types/opera';
 import { useOperaStore } from '@/store/useOperaStore';
-import Image from 'next/image';
 import { BookmarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 
-export default function OperaDetails({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: {
+    id: string;
+  };
+}
+
+export default function OperaPage({ params }: PageProps) {
   const store = useOperaStore();
-  const opera = store.operas.find((o) => o.id === params.id);
+  const [opera, setOpera] = useState<Opera | null>(null);
   const isInWishlist = store.wishlist.some((w) => w.operaId === params.id);
   const watchedEntry = store.watched.find((w) => w.operaId === params.id);
 
+  useEffect(() => {
+    const foundOpera = store.operas.find((o) => o.id === params.id);
+    if (foundOpera) {
+      setOpera(foundOpera);
+    }
+  }, [store.operas, params.id]);
+
   if (!opera) {
-    return <div>Opera not found</div>;
+    return <div className="p-4">Loading...</div>;
   }
 
   return (
-    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-      <div className="relative h-64 sm:h-96">
-        <Image
-          src={opera.imageUrl}
-          alt={opera.title}
-          fill
-          className="object-cover"
-        />
-      </div>
-      <div className="p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{opera.title}</h1>
-            <p className="text-xl text-gray-600">{opera.composer}</p>
-          </div>
-          <div className="flex space-x-4">
-            <button
-              onClick={() => {
-                if (isInWishlist) {
-                  store.removeFromWishlist(params.id);
-                } else {
-                  store.addToWishlist(params.id);
-                }
-              }}
-              className={`p-2 rounded-full ${
-                isInWishlist
-                  ? 'bg-indigo-100 text-indigo-600'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              <BookmarkIcon className="h-6 w-6" />
-            </button>
-            <button
-              onClick={() => {
-                if (!watchedEntry) {
-                  store.addToWatched({
-                    operaId: params.id,
-                    rating: 3,
-                    date: new Date().toISOString(),
-                    venue: '',
-                    cast: [],
-                    comments: [],
-                  });
-                }
-              }}
-              className={`p-2 rounded-full ${
-                watchedEntry
-                  ? 'bg-green-100 text-green-600'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              <CheckCircleIcon className="h-6 w-6" />
-            </button>
-          </div>
+    <div className="container mx-auto p-4">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="relative h-64">
+          <img
+            src={opera.imageUrl}
+            alt={opera.title}
+            className="w-full h-full object-cover"
+          />
         </div>
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold text-gray-900">Synopsis</h2>
-          <p className="mt-2 text-gray-600">{opera.synopsis}</p>
-        </div>
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold text-gray-900">First Performance</h2>
-          <p className="mt-2 text-gray-600">
-            {format(new Date(opera.firstPerformance.date), 'MMMM d, yyyy')} at{' '}
-            {opera.firstPerformance.place}
-          </p>
-        </div>
-        {watchedEntry && (
-          <div className="mt-6">
-            <h2 className="text-xl font-semibold text-gray-900">Your Experience</h2>
-            <div className="mt-2">
-              <p className="text-gray-600">
-                Watched on {format(new Date(watchedEntry.date), 'MMMM d, yyyy')}
-              </p>
-              <div className="mt-2 flex">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      store.addToWatched({
-                        ...watchedEntry,
-                        rating: (i + 1) as 1 | 2 | 3,
-                      });
-                    }}
-                    className={`h-6 w-6 mr-1 ${
-                      i < watchedEntry.rating
-                        ? 'text-yellow-400'
-                        : 'text-gray-300'
-                    }`}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
+        <div className="p-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">{opera.title}</h1>
+              <h2 className="text-xl text-gray-600 mb-4">by {opera.composer}</h2>
+            </div>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => {
+                  if (isInWishlist) {
+                    store.removeFromWishlist(params.id);
+                  } else {
+                    store.addToWishlist(params.id);
+                  }
+                }}
+                className={`p-2 rounded-full ${
+                  isInWishlist
+                    ? 'bg-indigo-100 text-indigo-600'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                <BookmarkIcon className="h-6 w-6" />
+              </button>
+              <button
+                onClick={() => {
+                  if (!watchedEntry) {
+                    store.addToWatched({
+                      operaId: params.id,
+                      rating: 3,
+                      date: new Date().toISOString(),
+                      venue: '',
+                      cast: [],
+                      comments: [],
+                    });
+                  }
+                }}
+                className={`p-2 rounded-full ${
+                  watchedEntry
+                    ? 'bg-green-100 text-green-600'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                <CheckCircleIcon className="h-6 w-6" />
+              </button>
             </div>
           </div>
-        )}
+          
+          <div className="mb-6 mt-6">
+            <h3 className="text-lg font-semibold mb-2">Synopsis</h3>
+            <p className="text-gray-700">{opera.synopsis || 'No synopsis available.'}</p>
+          </div>
+          
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-2">First Performance</h3>
+            <p className="text-gray-700">
+              {opera.firstPerformance.date && opera.firstPerformance.place ? (
+                <>
+                  {opera.firstPerformance.date} at {opera.firstPerformance.place}
+                </>
+              ) : (
+                'First performance details not available.'
+              )}
+            </p>
+          </div>
+
+          {watchedEntry && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-2">Your Experience</h3>
+              <p className="text-gray-700">
+                Watched on {format(new Date(watchedEntry.date), 'MMMM d, yyyy')}
+              </p>
+              <div className="flex items-center mt-2">
+                <span className="text-yellow-400 text-xl">
+                  {'★'.repeat(watchedEntry.rating)}
+                  {'☆'.repeat(5 - watchedEntry.rating)}
+                </span>
+              </div>
+              {watchedEntry.comments.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="font-semibold">Comments:</h4>
+                  <ul className="mt-2 space-y-2">
+                    {watchedEntry.comments.map((comment) => (
+                      <li key={comment.id} className="bg-gray-50 p-3 rounded">
+                        <p className="text-gray-700">{comment.text}</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          - {comment.author}, {format(new Date(comment.date), 'MMM d, yyyy')}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ import { OperaCard } from '@/components/OperaCard';
 import { format } from 'date-fns';
 
 export default function Watched() {
-  const { operas, watched } = useOperaStore();
+  const { operas, watched, removeFromWatched } = useOperaStore();
   const watchedOperas = watched
     .map((w) => ({
       ...w,
@@ -36,7 +36,7 @@ export default function Watched() {
                         <p className="text-sm text-gray-600">at {entry.venue}</p>
                       )}
                     </div>
-                    <div className="flex">
+                    <div className="flex items-center space-x-2">
                       {Array.from({ length: 3 }).map((_, i) => (
                         <span
                           key={i}
@@ -47,6 +47,13 @@ export default function Watched() {
                           ★
                         </span>
                       ))}
+                      <button
+                        onClick={() => removeFromWatched(entry.id)}
+                        className="ml-4 px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs font-semibold"
+                        title="Remove from watched"
+                      >
+                        Remove
+                      </button>
                     </div>
                   </div>
                   {entry.cast.length > 0 && (

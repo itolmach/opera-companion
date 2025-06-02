@@ -34,7 +34,7 @@ export async function getComposerDetails(composerId: string) {
 }
 
 export async function getPopularOperas() {
-  // First get popular composers
+  // Get popular composers
   const composersResponse = await fetch(
     `${OPENOPUS_API_BASE}/composer/list/pop.json`
   );
@@ -42,22 +42,20 @@ export async function getPopularOperas() {
     throw new Error('Failed to get popular composers');
   }
   const composersData = await composersResponse.json();
-  
-  // Then get their most popular works
-  const works: any[] = [];
-  for (const composer of composersData.composers || []) {
+  const composers = composersData.composers || [];
+
+  // Fetch all works for each composer
+  let allWorks: any[] = [];
+  for (const composer of composers) {
     const worksResponse = await fetch(
-      `${OPENOPUS_API_BASE}/work/list/composer/${composer.id}/pop.json`
+      `${OPENOPUS_API_BASE}/work/list/composer/${composer.id}/all.json`
     );
     if (!worksResponse.ok) continue;
     const worksData = await worksResponse.json();
     if (worksData.works) {
-      works.push(...worksData.works.filter((work: any) => 
-        work.genre?.toLowerCase().includes('opera') || 
-        work.title?.toLowerCase().includes('opera')
-      ));
+      // Attach composer info to each work for mapping
+      allWorks.push(...worksData.works.map((work: any) => ({ ...work, composer })));
     }
   }
-  
-  return works;
+  return allWorks;
 } 

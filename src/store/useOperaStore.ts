@@ -4,6 +4,7 @@ import { Opera, WatchedOpera, WishlistOpera } from '../types/opera';
 import * as api from '../lib/api';
 
 interface OperaStore {
+  allWorks: Opera[];
   operas: Opera[];
   watched: WatchedOpera[];
   wishlist: WishlistOpera[];
@@ -11,7 +12,7 @@ interface OperaStore {
   isLoading: boolean;
   error: string | null;
   setSearchQuery: (query: string) => void;
-  searchOperas: (query: string) => Promise<void>;
+  searchOperas: (query: string) => void;
   loadPopularOperas: () => Promise<void>;
   addToWishlist: (operaId: string) => void;
   removeFromWishlist: (operaId: string) => void;
@@ -23,31 +24,27 @@ interface OperaStore {
 export const useOperaStore = create<OperaStore>()(
   persist(
     (set, get) => ({
+      allWorks: [],
       operas: [],
       watched: [],
       wishlist: [],
       searchQuery: '',
       isLoading: false,
       error: null,
-      setSearchQuery: (query) => set({ searchQuery: query }),
-      searchOperas: async (query) => {
-        set({ isLoading: true, error: null });
-        try {
-          const results = await api.searchOperas(query);
-          const operas = results.map((result: any) => ({
-            id: `${result.composer.id}-${result.work.id}`,
-            title: result.work.title,
-            composer: result.composer.name,
-            synopsis: result.work.subtitle || '',
-            firstPerformance: {
-              date: result.work.year || '',
-              place: result.work.premiere || '',
-            },
-            imageUrl: result.composer.portrait || '/images/placeholder.jpg',
+      setSearchQuery: (query) => {
+        set({ searchQuery: query });
+        get().searchOperas(query);
+      },
+      searchOperas: (query) => {
+        if (!query) {
+          set((state) => ({ operas: state.allWorks }));
+        } else {
+          set((state) => ({
+            operas: state.allWorks.filter((opera) =>
+              opera.title.toLowerCase().includes(query.toLowerCase()) ||
+              opera.composer.toLowerCase().includes(query.toLowerCase())
+            ),
           }));
-          set({ operas, isLoading: false });
-        } catch (error) {
-          set({ error: 'Failed to search operas', isLoading: false });
         }
       },
       loadPopularOperas: async () => {
@@ -56,16 +53,16 @@ export const useOperaStore = create<OperaStore>()(
           const works = await api.getPopularOperas();
           const operas = works.map((work: any) => ({
             id: `${work.composer.id}-${work.id}`,
-            title: work.title,
-            composer: work.composer.complete_name || work.composer.name,
+            title: work.title || 'Untitled',
+            composer: work.composer.complete_name || work.composer.name || 'Unknown',
             synopsis: work.subtitle || '',
             firstPerformance: {
               date: work.year || '',
               place: work.premiere || '',
             },
-            imageUrl: `/images/${work.composer.id}.jpg`,
+            imageUrl: work.composer.portrait || '/images/placeholder.jpg',
           }));
-          set({ operas, isLoading: false });
+          set({ allWorks: operas, operas, isLoading: false });
         } catch (error) {
           console.error('Failed to load popular operas:', error);
           set({ error: 'Failed to load popular operas', isLoading: false });

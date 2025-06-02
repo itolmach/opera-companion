@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { MagnifyingGlassIcon, BookmarkIcon, CheckCircleIcon, UserCircleIcon } from "@heroicons/react/24/outline";
-import { Providers } from '@/components/Providers';
+import AppProviders from "@/components/AppProviders";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers>
+        <AppProviders>
           <div className="min-h-screen bg-gray-100">
             <nav className="bg-white shadow-sm">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -51,7 +51,7 @@ export default function RootLayout({
               {children}
             </main>
           </div>
-        </Providers>
+        </AppProviders>
       </body>
     </html>
   );
