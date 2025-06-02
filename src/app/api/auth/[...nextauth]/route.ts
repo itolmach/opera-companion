@@ -5,6 +5,12 @@ import type { NextAuthOptions } from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { PrismaClient } from '@/generated/prisma/client'; // Adjusted import path
 
+// Vercel Debugging for NEXTAUTH_SECRET
+console.log(
+  '[Custom Log] NEXTAUTH_SECRET on Vercel:',
+  process.env.NEXTAUTH_SECRET ? 'SET (length: ' + process.env.NEXTAUTH_SECRET.length + ')' : 'NOT SET or EMPTY'
+);
+
 const prisma = new PrismaClient();
 
 export const authOptions: NextAuthOptions = { // Export authOptions for potential use elsewhere
