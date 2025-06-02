@@ -28,7 +28,7 @@ model User {
 
 model WatchedOpera {
   id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   operaId   String
   rating    Int
@@ -36,6 +36,8 @@ model WatchedOpera {
   venue     String?
   cast      Json
   comments  Json
+
+  @@unique([userId, operaId])
 }
 
 model WishlistOpera {

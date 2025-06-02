@@ -15,7 +15,7 @@ interface OperaStore {
   userWatchedListLoaded: boolean;
   initialDataLoadAttempted: boolean;
   setSearchQuery: (query: string) => void;
-  searchOperas: (query: string) => void;
+  searchOperas: (query: string) => Promise<void>;
   loadInitialData: () => Promise<void>;
   loadUserWishlist: () => Promise<void>;
   addToWishlist: (operaId: string) => Promise<void>;
@@ -44,20 +44,43 @@ export const useOperaStore = create<OperaStore>()(
         set({ searchQuery: query });
         get().searchOperas(query);
       },
-      searchOperas: (query) => {
-        if (!query) {
-          set((state) => ({ operas: state.allWorks }));
-        } else {
-          set((state) => ({
-            operas: state.allWorks.filter((opera) =>
+      searchOperas: async (query) => {
+        const { allWorks, initialDataLoadAttempted, loadInitialData } = get();
+        
+        if (!initialDataLoadAttempted || allWorks.length === 0) {
+          set({ isLoading: true });
+          await loadInitialData();
+          const updatedAllWorks = get().allWorks;
+          if (get().error) {
+            set({ operas: [], isLoading: false });
+            return;
+          }
+          if (!query && updatedAllWorks.length > 0) {
+            set({ operas: [], isLoading: false });
+            return;
+          }
+          set({
+            operas: updatedAllWorks.filter((opera) =>
               opera.title.toLowerCase().includes(query.toLowerCase()) ||
               (opera.composer && opera.composer.toLowerCase().includes(query.toLowerCase()))
             ),
-          }));
+            isLoading: false,
+          });
+        } else {
+          if (!query) {
+            set({ operas: [] });
+          } else {
+            set({
+              operas: allWorks.filter((opera) =>
+                opera.title.toLowerCase().includes(query.toLowerCase()) ||
+                (opera.composer && opera.composer.toLowerCase().includes(query.toLowerCase()))
+              ),
+            });
+          }
         }
       },
       loadInitialData: async () => {
-        if (get().initialDataLoadAttempted && !get().error) {
+        if (get().initialDataLoadAttempted && get().allWorks.length > 0 && !get().error) {
           return;
         }
         set({ isLoading: true, error: null, initialDataLoadAttempted: true });
@@ -69,10 +92,10 @@ export const useOperaStore = create<OperaStore>()(
           }
           const operasData: Opera[] = await response.json();
           console.log(`[useOperaStore] Successfully fetched initial data. Number of operas: ${operasData.length}`);
-          set({ allWorks: operasData, operas: operasData, isLoading: false, error: null });
+          set({ allWorks: operasData, isLoading: false, error: null });
         } catch (error) {
           console.error('[useOperaStore] Failed to load initial opera data:', error);
-          set({ error: (error instanceof Error ? error.message : 'Failed to load data'), isLoading: false });
+          set({ error: (error instanceof Error ? error.message : 'Failed to load data'), isLoading: false, allWorks: [] });
         }
       },
       loadUserWishlist: async () => {
@@ -248,6 +271,7 @@ export const useOperaStore = create<OperaStore>()(
           watched: [],
           userWishlistLoaded: false,
           userWatchedListLoaded: false,
+          operas: [],
         });
       },
     }),
@@ -255,7 +279,6 @@ export const useOperaStore = create<OperaStore>()(
       name: 'opera-storage',
       partialize: (state) => ({
         allWorks: state.allWorks,
-        operas: state.operas,
         searchQuery: state.searchQuery,
         wishlist: state.wishlist,
         watched: state.watched,
