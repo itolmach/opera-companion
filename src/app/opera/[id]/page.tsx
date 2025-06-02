@@ -1,20 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Opera } from '@/types/opera';
 import { useOperaStore } from '@/store/useOperaStore';
 import { BookmarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 
-interface PageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function OperaPage({ params }: PageProps) {
+export default function OperaPage(props: any) {
+  const params = props.params;
   const store = useOperaStore();
-  const [opera, setOpera] = useState<Opera | null>(null);
+  const [opera, setOpera] = useState<any>(null);
   const isInWishlist = store.wishlist.some((w) => w.operaId === params.id);
   const watchedEntry = store.watched.find((w) => w.operaId === params.id);
 
@@ -94,7 +88,7 @@ export default function OperaPage({ params }: PageProps) {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2">First Performance</h3>
             <p className="text-gray-700">
-              {opera.firstPerformance.date && opera.firstPerformance.place ? (
+              {opera.firstPerformance?.date && opera.firstPerformance?.place ? (
                 <>
                   {opera.firstPerformance.date} at {opera.firstPerformance.place}
                 </>
