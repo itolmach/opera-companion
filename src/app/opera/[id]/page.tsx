@@ -49,7 +49,7 @@ export default function OperaPage(props: any) {
                   if (isInWishlist) {
                     store.removeFromWishlist(params.id);
                   } else {
-                    store.addToWishlist(params.id);
+                    store.addToWishlist(params.id, opera.title, opera.composer);
                   }
                 }}
                 className={`p-2 rounded-full ${
@@ -70,6 +70,8 @@ export default function OperaPage(props: any) {
                       venue: '',
                       cast: [],
                       comments: [],
+                      title: opera.title,
+                      composer: opera.composer,
                     });
                   }
                 }}

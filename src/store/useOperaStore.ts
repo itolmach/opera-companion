@@ -18,7 +18,7 @@ interface OperaStore {
   searchOperas: (query: string) => Promise<void>;
   loadInitialData: () => Promise<void>;
   loadUserWishlist: () => Promise<void>;
-  addToWishlist: (operaId: string) => Promise<void>;
+  addToWishlist: (operaId: string, title?: string, composer?: string) => Promise<void>;
   removeFromWishlist: (operaId: string) => Promise<void>;
   loadUserWatchedList: () => Promise<void>;
   addToWatched: (watchedItemData: Omit<WatchedOpera, 'id' | 'userId' | 'user'>) => Promise<void>;
@@ -118,12 +118,12 @@ export const useOperaStore = create<OperaStore>()(
           set({ error: (error instanceof Error ? error.message : 'Failed to load wishlist'), isLoading: false, userWishlistLoaded: false });
         }
       },
-      addToWishlist: async (operaIdToAdd) => {
+      addToWishlist: async (operaIdToAdd, title, composer) => {
         try {
           const response = await fetch('/api/wishlist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ operaId: operaIdToAdd }),
+            body: JSON.stringify({ operaId: operaIdToAdd, title, composer }),
           });
           if (!response.ok) {
             throw new Error('Failed to add to wishlist on server');
