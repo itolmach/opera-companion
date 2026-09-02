@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -12,7 +12,7 @@ export function useUser(): { user: User | null; status: AuthStatus } {
   const [status, setStatus] = useState<AuthStatus>("loading");
 
   useEffect(() => {
-    const supabase = createClient();
+    const supabase = getSupabase();
 
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);

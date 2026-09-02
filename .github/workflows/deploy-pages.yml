@@ -1,0 +1,85 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Every branch push deploys, so a new preview branch needs no workflow edit —
+  # except gh-pages itself, which this workflow writes to (excluding it stops
+  # the workflow retriggering off its own push).
+  push:
+    branches-ignore:
+      - gh-pages
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# gh-pages is a single branch every deploy pushes to; running two at once means
+# one of them loses a race. Queue instead of cancelling, so an earlier branch's
+# deploy still lands.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # One source of truth for the URL base and the gh-pages folder — the
+      # build and the publish step read the same answer instead of each
+      # deriving their own.
+      - id: cfg
+        run: node scripts/pages-config.mjs --github-output
+
+      - name: Build
+        env:
+          # A password in repo secrets (Settings -> Secrets -> Actions) gates
+          # every branch that doesn't carry its own .pages-password-hash. Leave
+          # it unset to rely on the per-branch hash files alone.
+          PAGES_PASSWORD: ${{ secrets.PAGES_PASSWORD }}
+          # Supabase for previews. Point these at the STAGING project, never
+          # the production one the iOS release depends on: every preview
+          # shares the itolmach.github.io origin, so a session (and any
+          # mistake) reaches across all of them.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: node scripts/build-gh-pages.mjs
+
+      # Classic "deploy from a branch" flow. Not actions/deploy-pages: that one
+      # needs a github-pages Actions environment which, by default, blocks
+      # deploys from any branch but the repo's default one — which would defeat
+      # "push any branch, get a preview."
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ steps.cfg.outputs.publish_dir }}
+          publish_branch: gh-pages
+          # Empty for the primary branch (publishes to the gh-pages root), the
+          # branch slug for everything else.
+          destination_dir: ${{ steps.cfg.outputs.destination_dir }}
+          # Publishing one branch must not wipe another branch's folder.
+          keep_files: true
+
+      - name: Refresh preview index
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          rm -rf /tmp/gh-pages-index
+          git clone --branch gh-pages --single-branch \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
+            /tmp/gh-pages-index
+          node scripts/build-gh-pages-index.mjs /tmp/gh-pages-index
+          cd /tmp/gh-pages-index
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Update preview index"
+          git push origin gh-pages

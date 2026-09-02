@@ -20,6 +20,17 @@
 # production
 /build
 
+# GitHub Pages preview build output
+.gh-pages-out/
+
+# Plaintext preview password. Only the hash (.pages-password-hash) is
+# committed -- this repo is public, so plaintext must never land in git.
+.pages-password
+.dashboard-password
+
+# Somewhere to keep the branch -> password table without publishing it.
+PASSWORDS.local.md
+
 # misc
 .DS_Store
 *.pem

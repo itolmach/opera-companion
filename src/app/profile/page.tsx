@@ -1,7 +1,7 @@
 "use client";
 import Image from 'next/image';
 import { useUser } from '@/lib/supabase/useUser';
-import { createClient } from '@/lib/supabase/client';
+import { getSupabase } from '@/lib/supabase/client';
 
 export default function ProfilePage() {
   const { user, status } = useUser();
@@ -32,9 +32,10 @@ export default function ProfilePage() {
         <p className="mb-2 text-gray-700">{user.email}</p>
         <button
           onClick={async () => {
-            const supabase = createClient();
-            await supabase.auth.signOut();
-            window.location.href = "/login";
+            await getSupabase().auth.signOut();
+            // Base-path aware: a bare "/login" would leave the preview
+            // folder and 404 on the Pages root.
+            window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/login`;
           }}
           className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 font-semibold"
         >

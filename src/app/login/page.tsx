@@ -1,12 +1,19 @@
 "use client";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const handleGoogleSignIn = async () => {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
+    // Static build: there's no /auth/callback route handler to bounce
+    // through, so Google returns to the app itself and the browser client
+    // reads the session straight out of the URL (detectSessionInUrl).
+    //
+    // The base path matters here. Under a preview the app lives at
+    // /<repo>/<branch>/, and redirecting to the bare origin would land on
+    // another branch's build, or on nothing at all.
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    await getSupabase().auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}${base}/` },
     });
   };
 

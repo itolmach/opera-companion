@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Opera, WatchedOpera, WishlistOpera } from '@/types';
-// import * as api from '../lib/api'; // We'll fetch local data now
+import * as api from '@/lib/supabase/data';
+
+// Signed-out is an ordinary state here, not an error worth showing: the
+// wishlist and watched list simply stay empty until someone logs in.
+function isNotSignedIn(error: unknown): boolean {
+  return error instanceof Error && error.message === 'Not signed in';
+}
 
 interface OperaStore {
   allWorks: Opera[];
@@ -85,8 +91,12 @@ export const useOperaStore = create<OperaStore>()(
         }
         set({ isLoading: true, error: null, initialDataLoadAttempted: true });
         try {
-          console.log('[useOperaStore] Attempting to load initial data from /data/all_operas.json');
-          const response = await fetch('/data/all_operas.json');
+          // Base-path aware: under a preview the catalogue lives at
+          // /<repo>/<branch>/data/all_operas.json, and fetch() does not get
+          // Next's basePath prepended for it the way next/link would.
+          const dataUrl = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/data/all_operas.json`;
+          console.log(`[useOperaStore] Attempting to load initial data from ${dataUrl}`);
+          const response = await fetch(dataUrl);
           if (!response.ok) {
             throw new Error(`Failed to fetch local opera data: ${response.statusText} (status: ${response.status})`);
           }
@@ -102,33 +112,20 @@ export const useOperaStore = create<OperaStore>()(
         if (get().userWishlistLoaded && !get().isLoading) return;
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('/api/wishlist');
-          if (!response.ok) {
-            if (response.status === 401) {
-              console.log('User not authenticated, cannot load wishlist.');
-              set({ isLoading: false, userWishlistLoaded: false, wishlist: [] });
-              return;
-            }
-            throw new Error('Failed to fetch user wishlist');
-          }
-          const userWishlist: WishlistOpera[] = await response.json();
+          const userWishlist = await api.fetchWishlist();
           set({ wishlist: userWishlist, userWishlistLoaded: true, isLoading: false });
         } catch (error) {
+          if (isNotSignedIn(error)) {
+            set({ isLoading: false, userWishlistLoaded: false, wishlist: [] });
+            return;
+          }
           console.error('Error loading user wishlist:', error);
           set({ error: (error instanceof Error ? error.message : 'Failed to load wishlist'), isLoading: false, userWishlistLoaded: false });
         }
       },
       addToWishlist: async (operaIdToAdd, title, composer) => {
         try {
-          const response = await fetch('/api/wishlist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ operaId: operaIdToAdd, title, composer }),
-          });
-          if (!response.ok) {
-            throw new Error('Failed to add to wishlist on server');
-          }
-          const newWishlistItem: WishlistOpera = await response.json();
+          const newWishlistItem = await api.addToWishlist(operaIdToAdd, title, composer);
           set((state) => ({
             wishlist: [...state.wishlist.filter(item => item.operaId !== operaIdToAdd), newWishlistItem],
           }));
@@ -139,12 +136,7 @@ export const useOperaStore = create<OperaStore>()(
       },
       removeFromWishlist: async (operaIdToRemove) => {
         try {
-          const response = await fetch(`/api/wishlist?operaId=${operaIdToRemove}`, {
-            method: 'DELETE',
-          });
-          if (!response.ok) {
-            throw new Error('Failed to remove from wishlist on server');
-          }
+          await api.removeFromWishlist(operaIdToRemove);
           set((state) => ({
             wishlist: state.wishlist.filter((item) => item.operaId !== operaIdToRemove),
           }));
@@ -157,38 +149,23 @@ export const useOperaStore = create<OperaStore>()(
         if (get().userWatchedListLoaded && !get().isLoading) return;
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('/api/watched');
-          if (!response.ok) {
-            if (response.status === 401) {
-              console.log('User not authenticated, cannot load watched list.');
-              set({ isLoading: false, userWatchedListLoaded: false, watched: [] });
-              return;
-            }
-            throw new Error('Failed to fetch user watched list');
-          }
-          const userWatchedList: WatchedOpera[] = await response.json();
+          const userWatchedList = await api.fetchWatched();
           set({ watched: userWatchedList, userWatchedListLoaded: true, isLoading: false });
         } catch (error) {
+          if (isNotSignedIn(error)) {
+            set({ isLoading: false, userWatchedListLoaded: false, watched: [] });
+            return;
+          }
           console.error('Error loading user watched list:', error);
           set({ error: (error instanceof Error ? error.message : 'Failed to load watched list'), isLoading: false, userWatchedListLoaded: false });
         }
       },
       addToWatched: async (watchedItemData) => {
         try {
-          const payload = {
+          const newWatchedItem = await api.saveWatched({
             ...watchedItemData,
             date: new Date(watchedItemData.date).toISOString(),
-          };
-          const response = await fetch('/api/watched', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
           });
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Failed to add to watched list on server' }));
-            throw new Error(errorData.message || 'Failed to add to watched list on server');
-          }
-          const newWatchedItem: WatchedOpera = await response.json();
           set((state) => ({
             watched: [...state.watched.filter(item => item.operaId !== newWatchedItem.operaId), newWatchedItem],
           }));
@@ -199,12 +176,7 @@ export const useOperaStore = create<OperaStore>()(
       },
       removeFromWatched: async (operaIdToRemove) => {
         try {
-          const response = await fetch(`/api/watched?operaId=${operaIdToRemove}`, {
-            method: 'DELETE',
-          });
-          if (!response.ok) {
-            throw new Error('Failed to remove from watched list on server');
-          }
+          await api.removeFromWatched(operaIdToRemove);
           set((state) => ({
             watched: state.watched.filter((item) => item.operaId !== operaIdToRemove),
           }));
@@ -236,33 +208,21 @@ export const useOperaStore = create<OperaStore>()(
 
         try {
             const updatedComments = [...(watchedEntry.comments || []), newComment];
-            const response = await fetch('/api/watched', {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...watchedEntry, comments: updatedComments }), 
-            });
-
-            if (!response.ok) {
-                set(state => ({
-                    watched: state.watched.map(item =>
-                        item.id === watchedEntry.id
-                            ? { ...item, comments: watchedEntry.comments || [] }
-                            : item
-                    ),
-                    error: 'Failed to save comment to server.'
-                }));
-                throw new Error('Failed to save comment to server');
-            }
-            const savedWatchedItem: WatchedOpera = await response.json();
+            const savedWatchedItem = await api.saveWatched({ ...watchedEntry, comments: updatedComments });
             set(state => ({
                 watched: state.watched.map(item => item.id === savedWatchedItem.id ? savedWatchedItem : item),
             }));
-
         } catch (error) {
+            // Put the optimistic comment back the way it was before failing.
             console.error('Error saving comment:', error);
-            if (!(error instanceof Error && get().error === 'Failed to save comment to server.')){
-                set({ error: (error instanceof Error ? error.message : 'Could not save comment') });
-            }
+            set(state => ({
+                watched: state.watched.map(item =>
+                    item.id === watchedEntry.id
+                        ? { ...item, comments: watchedEntry.comments || [] }
+                        : item
+                ),
+                error: (error instanceof Error ? error.message : 'Could not save comment'),
+            }));
         }
       },
       clearUserSessionData: () => {

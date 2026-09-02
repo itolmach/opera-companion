@@ -1,54 +1,146 @@
 # Opera Companion
 
 A Next.js web companion to the OperaApp iOS app. Same accounts, same
-wishlist/watched data -- both apps read and write the same Supabase project.
+wishlist/watched data — both apps read and write one Supabase project.
 
-## Shared backend
+Every branch you push publishes its own password-protected preview URL, so
+work in progress can be shared and tested as the **real app**, with real login
+and real data.
 
-This app and the OperaApp iOS app point at the **same Supabase project**:
+```
+https://itolmach.github.io/opera-companion/            <- main, public
+https://itolmach.github.io/opera-companion/<branch>/   <- any branch, password-gated
+https://itolmach.github.io/opera-companion/previews/   <- index of what's live
+```
 
-- Auth: Supabase Auth (Google OAuth here; Google + Sign in with Apple on
-  iOS). Signing in on either app signs into the same account.
-- Data: the same `user_lists` / `list_items` (wishlist) and
-  `attendance_logs` (watched) tables the iOS app uses. The schema,
-  migrations, and RLS policies live in the OperaApp repo under
-  `supabase/`; see that repo's `SUPABASE_SETUP.md` for how to stand up the
-  project and run the migrations.
+## Architecture: static, no server
 
-Because both apps share one Postgres schema, adding a feature here that
-needs a new column/table should go through that same migrations folder,
-not a separate one -- otherwise the two apps drift out of sync.
+This app is a **fully static export** (`output: "export"`). There is no server
+and no API layer: the browser talks to Supabase directly, and Row Level
+Security is the authorization boundary — the same boundary the iOS app relies
+on. The anon key is designed to be public and grants nothing on its own.
 
-## Getting Started
+That is why it can be served from GitHub Pages at all, and it means preview
+URLs run the genuine app rather than a mock.
 
-1. Copy `.env.local.example` to `.env.local` and fill in the Supabase
-   project's URL and anon key (same project as the iOS app's
-   `Config.xcconfig`).
-2. In that Supabase project's dashboard, enable the **Google** provider
-   under Authentication > Providers, and add
-   `<your-deployed-url>/auth/callback` (and `http://localhost:3000/auth/callback`
-   for local dev) to the redirect URL allow-list.
-3. Install dependencies and run the dev server:
+Consequences worth knowing:
+
+- **No server-side secrets, ever.** Everything shipped is public. A feature
+  needing a real secret needs a server — a Supabase Edge Function, or a host
+  like Vercel — it cannot live in this build.
+- **`/opera?id=<id>`, not `/opera/<id>`.** A static export must know every URL
+  at build time; a path segment would mean pre-rendering one page per opera in
+  the entire OpenOpus catalogue. The query string sidesteps that.
+- **OAuth returns to the app itself**, not to an `/auth/callback` route. The
+  browser client reads the session out of the URL (`detectSessionInUrl`).
+
+## Two Supabase projects
+
+| Project | Used by | Why |
+| --- | --- | --- |
+| **Production** | the iOS app | Real users. Nothing experimental touches it. |
+| **Staging** | this app's previews and `main` | Test data, throwaway accounts. |
+
+Keep them separate. Every preview shares the `itolmach.github.io` origin, so a
+session in `localStorage` is visible to *every* preview branch and to any other
+GitHub Pages project on that domain. Pointed at production, that would mean
+anyone holding a preview link could sign up against the database the iOS
+release depends on, and an RLS mistake on a scratch branch would become a
+production incident.
+
+The schema for both lives in the OperaApp repo under `supabase/migrations` —
+run the same migrations against each project. See its `SUPABASE_SETUP.md`.
+
+## Setup
+
+### 1. Environment
+
+Copy `.env.local.example` to `.env.local` and fill in the **staging** project's
+URL and anon key. Then:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+### 2. Repo secrets (for CI builds)
+
+Settings → Secrets and variables → Actions:
+
+| Secret | Value |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | staging project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | staging anon key |
+| `PAGES_PASSWORD` | *(optional)* gates every branch lacking its own hash |
+
+### 3. GitHub Pages
+
+- Settings → Actions → General → Workflow permissions → **Read and write**.
+- Push `main` once, then Settings → Pages → **Deploy from a branch** →
+  `gh-pages` → `/ (root)`.
+
+Not "GitHub Actions" as the source — that mode requires a `github-pages`
+environment which by default blocks deploys from non-default branches, which
+would kill every preview.
+
+### 4. Supabase redirect URLs
+
+Authentication → URL Configuration. Each branch has its own URL, so use a
+wildcard rather than editing this per branch:
+
+```
+https://itolmach.github.io/opera-companion/**
+http://localhost:3000/**
+```
+
+Enable the **Google** provider under Authentication → Providers.
+
+## Sharing a branch preview
+
+```bash
+git checkout -b redesign
+node scripts/new-password.mjs      # prints the password ONCE
+git add -A && git commit -m "..." && git push -u origin redesign
+```
+
+A minute later it's live at `/opera-companion/redesign/`, behind that password.
+Send both the link and the password.
+
+Passwords are **generated once and never rotated** — every shared link carries
+it, so rotating breaks all of them at once, silently. The script refuses to
+overwrite an existing one.
+
+The gate is a client-side SHA-256 check: it stops a link being casually
+readable, it is not security. The page content sits in the DOM behind the
+overlay.
+
+To take a preview down: delete the branch, then push anything — the next deploy
+prunes it.
+
+Before pushing, it's worth loading the real output locally:
+
+```bash
+node scripts/build-gh-pages.mjs
+python3 -m http.server -d .gh-pages-out 8000
+```
 
 ## Notes
 
-- Yandex sign-in (previously a NextAuth provider) isn't available yet --
-  Supabase Auth doesn't have a built-in Yandex provider. Yandex supports
-  OpenID Connect, so it can be added back via a custom OIDC provider in the
-  Supabase dashboard; see the comment in `src/app/login/page.tsx`.
-- The opera catalog itself still comes live from the public
-  [OpenOpus API](https://api.openopus.org), same as iOS -- there's nothing
-  to self-host there.
+- **Yandex sign-in** isn't available: Supabase Auth has no built-in Yandex
+  provider. Yandex speaks OpenID Connect, so it can return via a custom OIDC
+  provider — see the comment in `src/app/login/page.tsx`.
+- **Build depends on a third party.** `npm run build` first fetches the full
+  OpenOpus catalogue dump (`scripts/fetch-and-process-data.mjs`). If OpenOpus is
+  down or rate-limits, the build fails and nothing publishes. Failing loudly is
+  defensible — the app is useless without a catalogue — but it does mean
+  deploys depend on OpenOpus being up.
 
-## Deploy on Vercel
+## Where the preview machinery came from
 
-Set the two `NEXT_PUBLIC_SUPABASE_*` environment variables in the Vercel
-project settings, then deploy as usual. See the
-[Next.js deployment docs](https://nextjs.org/docs/app/building-your-application/deploying).
+`scripts/pages-config.mjs`, `build-gh-pages.mjs`, `password-gate.mjs`,
+`build-gh-pages-index.mjs`, `new-password.mjs`,
+`.github/workflows/deploy-pages.yml` and `workspace.config.json` are adopted
+from the [TolmachevFamily](https://github.com/itolmach/tolmachevfamily)
+workspace template. Only that half was taken: the template's `content/`
+dashboard and weekly-report routines stay in the workspace repo, since this is
+an app repo, not a personal workspace.
