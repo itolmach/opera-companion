@@ -50,7 +50,8 @@ function toWatchedOpera(row: any): WatchedOpera {
     rating: row.overall_rating,
     date: row.attendance_date,
     venue: row.venue_name,
-    cast: row.cast ?? [],
+    // DB column is cast_list, not cast -- "cast" is a reserved word in Postgres.
+    cast: row.cast_list ?? [],
     comments: row.comments ?? [],
     title: row.opera_title,
     composer: row.composer,
@@ -141,7 +142,7 @@ export async function saveWatched(entry: WatchedOpera): Promise<WatchedOpera> {
     country: "",
     attendance_date: attendanceDate.toISOString(),
     overall_rating: entry.rating,
-    cast: entry.cast ?? [],
+    cast_list: entry.cast ?? [],
     comments: entry.comments ?? [],
   };
 
