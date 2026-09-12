@@ -8,7 +8,7 @@ interface OperaCardProps {
 
 export function OperaCard({ opera }: OperaCardProps) {
   return (
-    <Link href={`/opera/${opera.id}`} className="block">
+    <Link href={`/opera?id=${encodeURIComponent(opera.id)}`} className="block">
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
         <div className="relative h-48 w-full">
           <Image

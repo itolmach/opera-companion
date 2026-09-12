@@ -1,24 +1,41 @@
 "use client";
-import { signIn } from "next-auth/react";
+import { getSupabase } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const handleGoogleSignIn = async () => {
+    // Static build: there's no /auth/callback route handler to bounce
+    // through, so Google returns to the app itself and the browser client
+    // reads the session straight out of the URL (detectSessionInUrl).
+    //
+    // The base path matters here. Under a preview the app lives at
+    // /<repo>/<branch>/, and redirecting to the bare origin would land on
+    // another branch's build, or on nothing at all.
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    await getSupabase().auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}${base}/` },
+    });
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
       <div className="bg-white p-8 rounded shadow-md w-full max-w-sm">
         <h1 className="text-2xl font-bold mb-6 text-center">Sign in</h1>
         <button
-          onClick={() => signIn("google")}
+          onClick={handleGoogleSignIn}
           className="w-full mb-4 py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
         >
           Sign in with Google
         </button>
-        <button
-          onClick={() => signIn("yandex")}
-          className="w-full py-2 px-4 bg-yellow-400 text-black rounded hover:bg-yellow-500 font-semibold"
-        >
-          Sign in with Yandex
-        </button>
+        {/*
+          Yandex sign-in used to be a NextAuth provider; Supabase Auth
+          doesn't have a built-in Yandex provider. Yandex supports OpenID
+          Connect, so it can come back via Authentication > Providers >
+          Add a custom OIDC provider in the Supabase dashboard, then
+          supabase.auth.signInWithOAuth({ provider: 'oidc', ... }) here --
+          see SUPABASE_SETUP.md in the OperaApp repo for the shared project.
+        */}
       </div>
     </div>
   );
-} 
+}

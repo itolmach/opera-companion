@@ -1,0 +1,17 @@
+{
+  "$comment": "Preview publishing config, adopted from the TolmachevFamily workspace template. Only the preview half of that template lives here -- the content/dashboard/routines half stays in the workspace repo, since this is an app repo, not a personal workspace.",
+  "repo": "itolmach/opera-companion",
+  "title": "Opera Companion",
+
+  "primaryBranch": "main",
+  "primaryDeploy": "root",
+  "previewIndexDir": "previews",
+  "pruneDeletedBranches": true,
+  "publishDir": ".gh-pages-out",
+
+  "build": {
+    "mode": "static",
+    "command": "npm run build",
+    "outDir": "out"
+  }
+}

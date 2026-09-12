@@ -1,25 +1,35 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useOperaStore } from '@/store/useOperaStore';
 import { BookmarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import Image from 'next/image';
 
-export default function OperaPage(props: any) {
-  const params = props.params;
+// Reached as /opera?id=<composerId>-<workId> rather than /opera/<id>.
+//
+// A static export has to know every URL at build time, and a path segment
+// would mean pre-rendering one HTML file per opera in the entire OpenOpus
+// catalogue. A query string is invisible to the static build -- one page
+// serves every opera -- and the page reads its data from the store on the
+// client either way, so nothing is lost.
+
+function OperaDetail() {
+  const searchParams = useSearchParams();
+  const operaId = searchParams.get('id') ?? '';
   const store = useOperaStore();
   const [opera, setOpera] = useState<any>(null);
-  const isInWishlist = store.wishlist.some((w) => w.operaId === params.id);
-  const watchedEntry = store.watched.find((w) => w.operaId === params.id);
+  const isInWishlist = store.wishlist.some((w) => w.operaId === operaId);
+  const watchedEntry = store.watched.find((w) => w.operaId === operaId);
 
   useEffect(() => {
-    const foundOpera = store.operas.find((o) => o.id === params.id);
+    const foundOpera = store.operas.find((o) => o.id === operaId);
     if (foundOpera) {
       setOpera(foundOpera);
     }
-  }, [store.operas, params.id]);
+  }, [store.operas, operaId]);
 
   if (!opera) {
     return <div className="p-4">Loading...</div>;
@@ -47,9 +57,9 @@ export default function OperaPage(props: any) {
               <button
                 onClick={() => {
                   if (isInWishlist) {
-                    store.removeFromWishlist(params.id);
+                    store.removeFromWishlist(operaId);
                   } else {
-                    store.addToWishlist(params.id);
+                    store.addToWishlist(operaId, opera.title, opera.composer);
                   }
                 }}
                 className={`p-2 rounded-full ${
@@ -64,12 +74,14 @@ export default function OperaPage(props: any) {
                 onClick={() => {
                   if (!watchedEntry) {
                     store.addToWatched({
-                      operaId: params.id,
+                      operaId: operaId,
                       rating: 3,
                       date: new Date().toISOString(),
                       venue: '',
                       cast: [],
                       comments: [],
+                      title: opera.title,
+                      composer: opera.composer,
                     });
                   }
                 }}
@@ -135,4 +147,14 @@ export default function OperaPage(props: any) {
       </div>
     </div>
   );
-} 
+}
+
+// useSearchParams() needs a Suspense boundary, or the static build fails
+// with "should be wrapped in a suspense boundary".
+export default function OperaPage() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading...</div>}>
+      <OperaDetail />
+    </Suspense>
+  );
+}
