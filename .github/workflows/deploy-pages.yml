@@ -59,13 +59,21 @@ jobs:
           # database and fail loudly at runtime. That is deliberate: a broken
           # preview is a far better outcome than a preview quietly writing to
           # production.
+          # Production's values are written in plainly rather than kept as
+          # secrets. They are not secret: both ship inside the JavaScript
+          # bundle, so anyone can read them with devtools. Row Level Security
+          # is what protects the data. Keeping them here means no repo-secret
+          # setup is needed for the site to work.
+          #
+          # The service_role key is the opposite -- it bypasses RLS entirely
+          # and must never appear in this repo or in any client build.
           NEXT_PUBLIC_SUPABASE_URL: >-
             ${{ github.ref_name == 'main'
-                && secrets.SUPABASE_URL_PRODUCTION
+                && 'https://ypblzqaltozesxxgcyha.supabase.co'
                 || secrets.SUPABASE_URL_STAGING }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: >-
             ${{ github.ref_name == 'main'
-                && secrets.SUPABASE_ANON_KEY_PRODUCTION
+                && 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlwYmx6cWFsdG96ZXN4eGdjeWhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1ODYwMTcsImV4cCI6MjA3OTE2MjAxN30.CNPnCRvUudfi3-C_HwsVx9hILqMBY8Z9kHZV_hYXg80'
                 || secrets.SUPABASE_ANON_KEY_STAGING }}
         run: node scripts/build-gh-pages.mjs
 
