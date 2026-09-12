@@ -16,9 +16,25 @@ let client: SupabaseClient | undefined;
 
 export function getSupabase(): SupabaseClient {
   if (!client) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    // These are baked in at build time, so missing values mean the build was
+    // made without them -- typically a preview branch built before the
+    // staging secrets existed. Say so plainly rather than failing somewhere
+    // deep inside the Supabase client.
+    if (!url || !anonKey) {
+      throw new Error(
+        "This build has no Supabase connection: NEXT_PUBLIC_SUPABASE_URL / " +
+          "NEXT_PUBLIC_SUPABASE_ANON_KEY were not set when it was built. " +
+          "For a preview branch, add the SUPABASE_*_STAGING repo secrets and " +
+          "push again. See README.md."
+      );
+    }
+
     client = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      url,
+      anonKey,
       {
         auth: {
           persistSession: true,

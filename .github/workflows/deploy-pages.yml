@@ -44,12 +44,29 @@ jobs:
           # every branch that doesn't carry its own .pages-password-hash. Leave
           # it unset to rely on the per-branch hash files alone.
           PAGES_PASSWORD: ${{ secrets.PAGES_PASSWORD }}
-          # Supabase for previews. Point these at the STAGING project, never
-          # the production one the iOS release depends on: every preview
-          # shares the itolmach.github.io origin, so a session (and any
-          # mistake) reaches across all of them.
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Which database this build talks to depends on the branch.
+          #
+          #   main            -> PRODUCTION. The public site, sharing one
+          #                      account and one dataset with the iOS app.
+          #   everything else -> STAGING. Throwaway data.
+          #
+          # The split matters because every branch preview is served from the
+          # same itolmach.github.io origin, so a session -- and any mistake on
+          # a half-finished branch -- reaches across all of them. A preview
+          # must not be able to touch what the iOS release depends on.
+          #
+          # If the staging secrets aren't set, preview builds ship without a
+          # database and fail loudly at runtime. That is deliberate: a broken
+          # preview is a far better outcome than a preview quietly writing to
+          # production.
+          NEXT_PUBLIC_SUPABASE_URL: >-
+            ${{ github.ref_name == 'main'
+                && secrets.SUPABASE_URL_PRODUCTION
+                || secrets.SUPABASE_URL_STAGING }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: >-
+            ${{ github.ref_name == 'main'
+                && secrets.SUPABASE_ANON_KEY_PRODUCTION
+                || secrets.SUPABASE_ANON_KEY_STAGING }}
         run: node scripts/build-gh-pages.mjs
 
       # Classic "deploy from a branch" flow. Not actions/deploy-pages: that one

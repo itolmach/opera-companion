@@ -38,8 +38,12 @@ Consequences worth knowing:
 
 | Project | Used by | Why |
 | --- | --- | --- |
-| **Production** | the iOS app | Real users. Nothing experimental touches it. |
-| **Staging** | this app's previews and `main` | Test data, throwaway accounts. |
+| **Production** | `main` (the public site) and the iOS app | Real users. One account, one dataset across web and iOS. |
+| **Staging** | every preview branch | Throwaway data. |
+
+The deploy workflow picks between them by branch name, so this is automatic:
+push to `main` and you're building against production, push anything else and
+you're building against staging.
 
 Keep them separate. Every preview shares the `itolmach.github.io` origin, so a
 session in `localStorage` is visible to *every* preview branch and to any other
@@ -69,9 +73,15 @@ Settings → Secrets and variables → Actions:
 
 | Secret | Value |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | staging project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | staging anon key |
+| `SUPABASE_URL_PRODUCTION` | production project URL — used by `main` |
+| `SUPABASE_ANON_KEY_PRODUCTION` | production anon key |
+| `SUPABASE_URL_STAGING` | staging project URL — used by every other branch |
+| `SUPABASE_ANON_KEY_STAGING` | staging anon key |
 | `PAGES_PASSWORD` | *(optional)* gates every branch lacking its own hash |
+
+Until the staging pair exists, preview branches build without a database and
+say so at runtime. That's the intended failure: a broken preview beats a
+preview quietly writing to production.
 
 ### 3. GitHub Pages
 
